@@ -1,70 +1,90 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import {PanResponder, Text, View} from "react-native";
+import Svg, {Circle, Line} from "react-native-svg";
+import mainStyle, {screenSize, center} from "@/styles/main.style";
+import {
+    MultipleR,
+    point,
+    point2D, Quaternion,
+    R,
+    rotateXYZ,
+    rotationAxis,
+} from "@/logics/rotations";
+import {getBindingIdentifiers} from "@babel/types";
+import {useRef, useState} from "react";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function App() {
+    const [ universalRotation, setUniversalRotation ] = useState(new Quaternion(1, 0, 0, 0));
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({ ios: 'cmd + d', android: 'cmd + m' })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+    const initialReference = useRef({ x: 0, y: 0 }).current;
+    const initialRotations = useRef({ x: 0, y: 0, z: 0 });
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: (evt) => {
+                // Guarda el punto inicial al presionar
+                initialReference.x = evt.nativeEvent.locationX;
+                initialReference.y = evt.nativeEvent.locationY;
+                // setReferences(prevReferences => {
+                //     initialRotations.current.x = prevReferences.x.theta;
+                //     initialRotations.current.y = prevReferences.y.theta;
+                //     initialRotations.current.z = prevReferences.z.theta;
+                //     return prevReferences;
+                // });
+            },
+            onPanResponderMove: (evt, gestureState) => {
+                // Mueve el segundo punto según la posición del dedo (opcional si deseas mostrar algo visualmente)
+                const deltaX = evt.nativeEvent.locationX - initialReference.x;
+                const deltaY = evt.nativeEvent.locationY - initialReference.y;
+
+                setUniversalRotation(prevState => {
+                    // Aplica rotaciones sobre los ejes globales
+                    const rotationX = Quaternion.fromAxisAngle({ x: 1, y: 0, z: 0 }, deltaY * 0.01); // Eje X global
+                    const rotationY = Quaternion.fromAxisAngle({ x: 0, y: 1, z: 0 }, deltaX * 0.01); // Eje Y global
+                    const fixedRotation = rotationX.multiply(rotationY);
+
+                    // En lugar de acumular rotaciones en el estado previo, combinamos las nuevas rotaciones de forma independiente
+                    return fixedRotation.multiply(prevState);
+                });
+
+                initialReference.x = evt.nativeEvent.locationX;
+                initialReference.y = evt.nativeEvent.locationY;
+            },
+            onPanResponderRelease: (evt, gestureState) => {
+            },
+        })
+    ).current;
+
+    return (
+    <View
+    style={mainStyle["main-view"]}
+    {...panResponder.panHandlers}
+    >
+        {/*<Text style={{...mainStyle.stats, top: 80}}>*/}
+        {/*    Rotation: {references.x.theta.toFixed(2)} {references.y.theta.toFixed(2)}*/}
+        {/*</Text>*/}
+        {/*<Text style={{...mainStyle.stats, top: 100}}>*/}
+        {/*    Reference: {JSON.stringify(references)}*/}
+        {/*</Text>*/}
+        <Svg>
+            <RenderDot coordinates={{ x: 0, y: 0, z: 0 }} rotationAxis={universalRotation} color="black" />
+            <RenderDot coordinates={{ x: 10, y: 0, z: 0 }} rotationAxis={universalRotation} color="red" />
+            <RenderDot coordinates={{ x: 0, y: 10, z: 0 }} rotationAxis={universalRotation} color="green" />
+            <RenderDot coordinates={{ x: 0, y: 0, z: 10 }} rotationAxis={universalRotation} color="blue" />
+
+            {/*<Circle cx={center.x + universalRotation.toPoint().x * 20} cy={center.y - universalRotation.toPoint().y * 20} r={3} fill="black" />*/}
+        </Svg>
+    </View>
+    );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+function RenderDot(args: {
+    coordinates: point,
+    rotationAxis: Quaternion,
+    color: string,
+}) {
+    const { coordinates, rotationAxis, color } = args;
+    const rotation = MultipleR(rotationAxis, coordinates);
+    return <Circle cx={center.x + rotation.x} cy={center.y - rotation.y} r={1 + rotation.z/10} fill={color} />;
+}
